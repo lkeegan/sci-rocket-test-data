@@ -1,0 +1,177 @@
+from pathlib import Path
+
+
+configfile: "config/config.yaml"
+
+
+config["OUTPUT_DIR"] = str(Path(config["OUTPUT_DIR"]).resolve())
+
+
+rule all:
+    input:
+        f"{config['OUTPUT_DIR']}/upload/test-data.tgz",
+
+
+rule make_upload_archive:
+    output:
+        f"{config['OUTPUT_DIR']}/upload/test-data.tgz",
+    input:
+        f"{config['OUTPUT_DIR']}/results/genome/dna.fa",
+        f"{config['OUTPUT_DIR']}/results/genome/dna.gtf",
+        expand(
+            f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/{{run_type}}/Undetermined_S0_{{read}}_001.fastq.gz",
+            fastq_source=["fastq_from_aviti", "fastq_from_bcl"],
+            run_type=["one_run/run1", "two_runs/run1", "two_runs/run2"],
+            read=["R1", "R2"],
+        ),
+    params:
+        results_dir=f"{config['OUTPUT_DIR']}/results",
+    log:
+        f"{config['OUTPUT_DIR']}/logs/make_upload_archive.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        cd {params.results_dir}
+        tar -czvf {output}  *
+        """
+
+
+# rule make_bcl_reads:
+#     input:
+#         r1=f"{config['READS_DIR']}/Undetermined_S0_R1_001.fastq.gz",
+#         r2=f"{config['READS_DIR']}/Undetermined_S0_R2_001.fastq.gz",
+#     output:
+#         r1=f"{config['OUTPUT_DIR']}/results/reads/fastq/Undetermined_S0_R1_001.fastq.gz",
+#         r2=f"{config['OUTPUT_DIR']}/results/reads/fastq/Undetermined_S0_R2_001.fastq.gz",
+#     params:
+#         output_dir=f"{config['OUTPUT_DIR']}/resources/reads/fastq",
+#     log:
+#         f"{config['OUTPUT_DIR']}/logs/copy_fastq_reads.log",
+#     conda:
+#         "envs/fastq2bcl.yaml"
+#     shell:
+#         """
+# TODO: exclude-index needed for it to run, but need to check if this is correct - if it round trips to the same workflow outputs then presumably it's fine
+#         fastq2bcl -r1 Undetermined_S0_R1_001.fastq.gz -r2 Undetermined_S0_R2_001.fastq.gz -o . --exclude-index
+#         """
+
+
+rule process_fastq:
+    wildcard_constraints:
+        fastq_source="fastq_from_aviti|fastq_from_bcl",
+    input:
+        r1=f"{config['READS_DIR']}/{{fastq_source}}/Undetermined_S0_R1_001.fastq.gz",
+        r2=f"{config['READS_DIR']}/{{fastq_source}}/Undetermined_S0_R2_001.fastq.gz",
+    output:
+        r1=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/one_run/run1/Undetermined_S0_R1_001.fastq.gz",
+        r2=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/one_run/run1/Undetermined_S0_R2_001.fastq.gz",
+        run1r1=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/two_runs/run1/Undetermined_S0_R1_001.fastq.gz",
+        run1r2=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/two_runs/run1/Undetermined_S0_R2_001.fastq.gz",
+        run2r1=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/two_runs/run2/Undetermined_S0_R1_001.fastq.gz",
+        run2r2=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/two_runs/run2/Undetermined_S0_R2_001.fastq.gz",
+    params:
+        output_dir1=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/one_run",
+        output_dir2=f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/two_runs",
+        split_dir=f"{config['OUTPUT_DIR']}/resources/reads/{{fastq_source}}/split",
+    log:
+        f"{config['OUTPUT_DIR']}/logs/process_fastq_from_{{fastq_source}}.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        # copy for single run
+        mkdir -p {params.output_dir1}/run1
+        cp {input.r1} {output.r1}
+        cp {input.r2} {output.r2}
+        
+        # split in half to make two runs with same combined reads 
+        mkdir -p {params.output_dir2}/run1
+        mkdir -p {params.output_dir2}/run2
+        mkdir -p {params.split_dir}
+        seqkit split2 -p 2 -1 {input.r1} -2 {input.r2} -e .gz -O {params.split_dir} 2>> {log}
+        mv {params.split_dir}/Undetermined_S0_R1_001.part_001.fastq.gz {output.run1r1}
+        mv {params.split_dir}/Undetermined_S0_R2_001.part_001.fastq.gz {output.run1r2}
+        mv {params.split_dir}/Undetermined_S0_R1_001.part_002.fastq.gz {output.run2r1}
+        mv {params.split_dir}/Undetermined_S0_R2_001.part_002.fastq.gz {output.run2r2}
+        """
+
+
+rule download_genome_fasta:
+    output:
+        f"{config['OUTPUT_DIR']}/resources/genome/dna.fa",
+    params:
+        url=config["GENOME_FASTA_URL"],
+    log:
+        f"{config['OUTPUT_DIR']}/logs/download_genome_fasta.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        wget -q -O - {params.url} | gunzip > {output} 2> {log}
+        """
+
+
+rule download_genome_gtf:
+    output:
+        f"{config['OUTPUT_DIR']}/resources/genome/dna.gtf",
+    params:
+        url=config["GENOME_GTF_URL"],
+    log:
+        f"{config['OUTPUT_DIR']}/logs/download_genome_gtf.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        wget -q -O - {params.url} | gunzip > {output} 2> {log}
+        """
+
+
+rule index_genome_fasta:
+    input:
+        f"{config['OUTPUT_DIR']}/resources/genome/dna.fa",
+    output:
+        f"{config['OUTPUT_DIR']}/resources/genome/dna.fa.fai",
+    log:
+        f"{config['OUTPUT_DIR']}/logs/index_genome_fasta.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        samtools faidx {input} 2> {log}
+        """
+
+
+rule extract_genome_fasta:
+    input:
+        fa=f"{config['OUTPUT_DIR']}/resources/genome/dna.fa",
+        fai=f"{config['OUTPUT_DIR']}/resources/genome/dna.fa.fai",
+    output:
+        f"{config['OUTPUT_DIR']}/results/genome/dna.fa",
+    params:
+        chr=config["CHR"],
+    log:
+        f"{config['OUTPUT_DIR']}/logs/extract_genome_fasta.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        samtools faidx {input.fa} {params.chr} > {output} 2> {log}
+        """
+
+
+rule extract_genome_gtf:
+    input:
+        f"{config['OUTPUT_DIR']}/resources/genome/dna.gtf",
+    output:
+        f"{config['OUTPUT_DIR']}/results/genome/dna.gtf",
+    params:
+        chr=config["CHR"],
+    log:
+        f"{config['OUTPUT_DIR']}/logs/extract_genome_gtf.log",
+    conda:
+        "envs/tools.yaml"
+    shell:
+        """
+        gffread {input} -r {params.chr} -T -o {output} 2> {log}
+        """

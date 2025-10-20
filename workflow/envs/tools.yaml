@@ -1,0 +1,10 @@
+name: genome_tools
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - bioconda::samtools
+  - bioconda::gffread
+  - bioconda::seqkit
+  - conda-forge::wget
+  - conda-forge::gzip

@@ -1,0 +1,8 @@
+name: fastq2bcl
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pip
+  - pip:
+      - fastq2bcl

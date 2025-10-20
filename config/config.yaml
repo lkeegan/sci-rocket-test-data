@@ -1,0 +1,5 @@
+GENOME_FASTA_URL: "https://ftp.ensembl.org/pub/release-115/fasta/danio_rerio/dna/Danio_rerio.GRCz11.dna.toplevel.fa.gz"
+GENOME_GTF_URL: "https://ftp.ensembl.org/pub/release-115/gtf/danio_rerio/Danio_rerio.GRCz11.115.gtf.gz"
+CHR: "25"
+OUTPUT_DIR: "output"
+READS_DIR: "reads"
