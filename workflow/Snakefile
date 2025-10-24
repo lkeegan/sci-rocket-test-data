@@ -19,10 +19,14 @@ rule make_upload_archive:
         f"{config['OUTPUT_DIR']}/results/genome/dna.fa",
         f"{config['OUTPUT_DIR']}/results/genome/dna.gtf",
         expand(
-            f"{config['OUTPUT_DIR']}/results/reads/{{fastq_source}}/{{run_type}}/Undetermined_S0_{{read}}_001.fastq.gz",
-            fastq_source=["fastq_from_aviti", "fastq_from_bcl"],
+            f"{config['OUTPUT_DIR']}/results/reads/{{source}}/{{run_type}}/Undetermined_S0_{{read}}_001.fastq.gz",
+            source=["fastq_from_aviti", "fastq_from_bcl"],
             run_type=["one_run/run1", "two_runs/run1", "two_runs/run2"],
             read=["R1", "R2"],
+        ),
+        expand(
+            f"{config['OUTPUT_DIR']}/results/reads/bcl/{{run_type}}/.done",
+            run_type=["one_run/run1", "two_runs/run1", "two_runs/run2"],
         ),
     params:
         results_dir=f"{config['OUTPUT_DIR']}/results",
@@ -37,24 +41,52 @@ rule make_upload_archive:
         """
 
 
-# rule make_bcl_reads:
-#     input:
-#         r1=f"{config['READS_DIR']}/Undetermined_S0_R1_001.fastq.gz",
-#         r2=f"{config['READS_DIR']}/Undetermined_S0_R2_001.fastq.gz",
-#     output:
-#         r1=f"{config['OUTPUT_DIR']}/results/reads/fastq/Undetermined_S0_R1_001.fastq.gz",
-#         r2=f"{config['OUTPUT_DIR']}/results/reads/fastq/Undetermined_S0_R2_001.fastq.gz",
-#     params:
-#         output_dir=f"{config['OUTPUT_DIR']}/resources/reads/fastq",
-#     log:
-#         f"{config['OUTPUT_DIR']}/logs/copy_fastq_reads.log",
-#     conda:
-#         "envs/fastq2bcl.yaml"
-#     shell:
-#         """
-# TODO: exclude-index needed for it to run, but need to check if this is correct - if it round trips to the same workflow outputs then presumably it's fine
-#         fastq2bcl -r1 Undetermined_S0_R1_001.fastq.gz -r2 Undetermined_S0_R2_001.fastq.gz -o . --exclude-index
-#         """
+rule make_bcl_reads:
+    wildcard_constraints:
+        run_type="one_run/run1|two_runs/run1|two_runs/run2",
+    input:
+        r1=f"{config['OUTPUT_DIR']}/results/reads/fastq_from_bcl/{{run_type}}/Undetermined_S0_R1_001.fastq.gz",
+        r2=f"{config['OUTPUT_DIR']}/results/reads/fastq_from_bcl/{{run_type}}/Undetermined_S0_R2_001.fastq.gz",
+    output:
+        dir=directory(f"{config['OUTPUT_DIR']}/results/reads/bcl/{{run_type}}"),
+        touch=touch(f"{config['OUTPUT_DIR']}/results/reads/bcl/{{run_type}}/.done"),
+    params:
+        roundtrip_dir=f"{config['OUTPUT_DIR']}/resources/reads/fastq_from_bcl/{{run_type}}/roundtrip",
+    log:
+        f"{config['OUTPUT_DIR']}/logs/make_bcl_reads_{{run_type}}.log",
+    conda:
+        "envs/fastq2bcl.yaml"
+    shell:
+        """
+        # confirm we are using our fork of fastq2bcl
+        which fastq2bcl &> {log} 
+        fastq2bcl --version &>> {log}
+
+        # convert fastq to bcl
+        mkdir -p {output.dir}
+        fastq2bcl -r1 {input.r1} -r2 {input.r2} -o {output.dir} &>> {log} && touch {output.touch}
+
+        # convert the generated bcl files back to fastq to verify integrity
+        mkdir -p {params.roundtrip_dir}
+        echo -e "[DATA]\nLane,Sample_ID,Sample_Name,index,index2\n,fake,fake,NNNNNNNNNN,NNNNNNNNNN" > {params.roundtrip_dir}/fake.csv
+        bcl2fastq \
+            --barcode-mismatches 1 \
+            --ignore-missing-positions \
+            --ignore-missing-controls \
+            --ignore-missing-filter \
+            --ignore-missing-bcls \
+            --no-lane-splitting \
+            --minimum-trimmed-read-length 15 \
+            --mask-short-adapter-reads 15 \
+            -R {output.dir}/YYMMDD_VH00821_0006_AACCCKLM5 \
+            --sample-sheet {params.roundtrip_dir}/fake.csv \
+            --output-dir {params.roundtrip_dir} \
+            &>> {log}
+
+        # compare original and roundtrip fastq files
+        diff <(zcat {input.r1}) <(zcat {params.roundtrip_dir}/Undetermined_S0_R1_001.fastq.gz) &>> {log} 
+        diff <(zcat {input.r2}) <(zcat {params.roundtrip_dir}/Undetermined_S0_R2_001.fastq.gz) &>> {log} 
+        """
 
 
 rule process_fastq:

@@ -2,7 +2,8 @@ name: fastq2bcl
 channels:
   - conda-forge
 dependencies:
+  - bih-cubi::bcl2fastq2
   - python
   - pip
   - pip:
-      - fastq2bcl
+      - git+https://github.com/lkeegan/fastq2bcl@dual_index_support

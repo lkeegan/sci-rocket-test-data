@@ -15,14 +15,17 @@ This repo contains a snakemake workflow that generates the genome and read test 
 - reads
   - fastq_from_aviti
     - one_run: single run with 100k reads
-    - two_runs: two runs with 50k reads each, same data as one_run but split across two runs
+    - two_runs: two runs with 50k reads each (same data when combined as one_run above)
   - fastq_from_bcl
     - one_run: single run with 100k reads
-    - two_runs: two runs with 50k reads each, same data as one_run but split across two runs
+    - two_runs: two runs with 50k reads each (same data when combined as one_run above)
+  - bcl (same data as fastq_from_bcl, but in bcl format)
+    - one_run: single run with 100k reads
+    - two_runs: two runs with 50k reads each (same data when combined as one_run above)
 
 ## running locally
 
-`snakemake --use-conda`
+`snakemake --use-conda --cores all`
 
 ## CI
 
