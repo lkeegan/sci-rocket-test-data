@@ -14,13 +14,8 @@ jobs:
           args: '--use-conda --conda-cleanup-pkgs cache -p --cores 4 --verbose'
           stagein: ''
           show-disk-usage-on-error: true
-      - run: |
-          mkdir upload
-          cd output/results
-          tar -czvf test-data.tgz *
-          mv test-data.tgz ../upload/.
       - if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
-        name: Upload test data to release
+        name: Upload test data to release (only for tagged commits)
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
