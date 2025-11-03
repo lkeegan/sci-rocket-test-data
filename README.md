@@ -2,6 +2,10 @@
 
 This repo contains a snakemake workflow that generates the genome and read test data used for CI testing of sci-rocket.
 
+Download the latest [test-data.tgz](https://github.com/lauren-saunders-lab/sci-rocket-test-data/releases/latest/download/test-data.tgz)
+
+Or get a specific tagged version of the dataset, e.g. [2025.11.03](https://github.com/lauren-saunders-lab/sci-rocket-test-data/releases/download/2025.11.03/test-data.tgz)
+
 ## data included in repo
 
 - reads
@@ -25,12 +29,16 @@ This repo contains a snakemake workflow that generates the genome and read test 
 
 ## running locally
 
+To run the workflow and generate the test data, [install snakemake](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html), then do:
+
 `snakemake --use-conda --cores all`
 
-## CI
+## updating the test data
 
-On every push to main, the workflow is automatically executed,
-and the resulting test data tarball is uploaded to github pages,
-which can be downloaded from keegan.ch/sci-rocket-test-data/test-data.tgz
+After making your changes, commit and push them to check that the CI runs without errors.
+Then tag this commit with today's date to trigger the CI to create a new release:
 
-TODO: should probably upload to release on tagged commits instead & disable github pages.
+```
+git tag 2025.12.01
+git push origin 2025.12.01
+```
