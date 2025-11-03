@@ -19,19 +19,11 @@ jobs:
           cd output/results
           tar -czvf test-data.tgz *
           mv test-data.tgz ../upload/.
-      - uses: actions/upload-pages-artifact@v4
+      - if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
+        name: Upload test data to release
+        uses: svenstaro/upload-release-action@v2
         with:
-          path: 'output/upload/'
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: build
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: 'output/upload/test-data.tgz'
+          tag: ${{ github.ref }}
+          overwrite: true
