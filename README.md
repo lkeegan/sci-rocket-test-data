@@ -1,6 +1,6 @@
 # sci-rocket-test-data
 
-This repo contains a snakemake workflow that generates the genome and read test data used for CI testing of sci-rocket.
+This repo contains a snakemake workflow that generates the genome and read test data used for CI testing of [sci-rocket](https://github.com/lauren-saunders-lab/sci-rocket).
 
 Download the latest [test-data.tgz](https://github.com/lauren-saunders-lab/sci-rocket-test-data/releases/latest/download/test-data.tgz)
 
